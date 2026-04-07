@@ -55,8 +55,8 @@
 
     <div class="flex min-h-screen">
         
-        <!-- LEFT SIDEBAR -->
-        <div class="w-80 bg-gradient-to-b from-emerald-800 to-emerald-950 text-white h-screen sticky top-0 overflow-auto shadow-2xl">
+        <!-- LEFT SIDEBAR (desktop) -->
+        <div class="hidden md:block w-80 bg-gradient-to-b from-emerald-800 to-emerald-950 text-white h-screen sticky top-0 overflow-auto shadow-2xl desktop-sidebar">
             <div class="p-8">
                 <div class="flex items-center gap-4 mb-16">
                     <div class="w-14 h-14 bg-white rounded-3xl flex items-center justify-center text-4xl shadow-inner">🌾</div>
@@ -70,14 +70,34 @@
             </div>
         </div>
 
+        <!-- MOBILE SIDEBAR (overlay) -->
+        <div id="mobile-sidebar" class="fixed inset-0 z-50 md:hidden hidden opacity-0 transition-opacity duration-300">
+            <div class="absolute inset-0 bg-black/60" onclick="closeMobileSidebar()"></div>
+            <div id="mobile-sidebar-panel" class="relative w-72 bg-gradient-to-b from-emerald-800 to-emerald-950 text-white h-full overflow-auto shadow-2xl p-6 translate-x-[-100%] transition-transform duration-300">
+                <div class="flex items-center justify-between mb-8">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-white rounded-3xl flex items-center justify-center text-3xl">🌾</div>
+                        <div>
+                            <h2 class="title-font text-2xl font-bold">Ganesh</h2>
+                            <p class="text-emerald-300 text-sm -mt-1">Premium Groceries</p>
+                        </div>
+                    </div>
+                    <button onclick="closeMobileSidebar()" class="text-3xl">×</button>
+                </div>
+                <div class="space-y-2" id="mobile-sidebar-menu"></div>
+            </div>
+        </div>
+
         <!-- MAIN CONTENT -->
         <div class="flex-1">
             <!-- TOP PILLS -->
-            <div class="glass border-b sticky top-0 z-50 bg-white/80 backdrop-blur-md">
+            <div id="top-bar" class="glass border-b sticky top-0 z-50 bg-white/80 backdrop-blur-md" role="navigation" aria-label="Top controls">
                 <div class="px-12 py-7 flex items-center gap-6">
-                    <div class="mr-auto flex items-center">
-                        <input id="shop-name-input" placeholder="Shop name (optional)" class="text-lg font-semibold text-emerald-700 placeholder:text-emerald-400 bg-transparent border-none focus:outline-none" />
-                    </div>
+                        <!-- Mobile hamburger -->
+                        <button class="md:hidden mr-4 p-3 rounded-lg bg-white/90" onclick="openMobileSidebar()" aria-label="Open menu">☰</button>
+                        <div class="mr-auto flex items-center">
+                            <input id="shop-name-input" placeholder="Shop name (optional)" class="text-lg font-semibold text-emerald-700 placeholder:text-emerald-400 bg-transparent border-none focus:outline-none" />
+                        </div>
                     <div class="flex items-center gap-6 overflow-x-auto" id="top-pills"></div>
                 </div>
             </div>
@@ -318,6 +338,9 @@
                 })
             }
             menu.innerHTML = html
+            // also populate mobile sidebar menu when present
+            const mobileMenu = document.getElementById('mobile-sidebar-menu')
+            if (mobileMenu) mobileMenu.innerHTML = html
         }
 
         function switchCategory(cat) {
@@ -339,6 +362,8 @@
             document.getElementById('sub-title').textContent = getSubTitle(cat)
             renderSidebar()
             renderProducts(productsByCategory[cat] || [])
+            // close mobile sidebar after selecting on small screens
+            if (typeof closeMobileSidebar === 'function') closeMobileSidebar()
         }
 
         function switchSpiceSub(sub) {
@@ -347,6 +372,8 @@
             document.getElementById('sub-title').textContent = ""
             renderSidebar()
             renderProducts(productsByCategory[sub] || [])
+            // close mobile sidebar after selecting on small screens
+            if (typeof closeMobileSidebar === 'function') closeMobileSidebar()
         }
 
         function getSubTitle(cat) {
@@ -533,14 +560,76 @@
             }
         }
 
+        // Improved initialize with mobile sidebar animation setup
         function initialize() {
             renderTopPills()
             renderSidebar()
             renderProducts(productsByCategory["Atta"])
             bindShopNameInput()
+
+            // prepare mobile sidebar for transitions
+            const mobileSidebar = document.getElementById('mobile-sidebar')
+            const mobilePanel = document.getElementById('mobile-sidebar-panel')
+            if (mobileSidebar) {
+                mobileSidebar.style.transition = 'opacity 0.3s ease'
+                mobileSidebar.style.opacity = '0'
+                mobileSidebar.setAttribute('aria-hidden', 'true')
+            }
+            if (mobilePanel) {
+                mobilePanel.style.transition = 'transform 0.28s ease'
+                mobilePanel.style.transform = 'translateX(-100%)'
+            }
         }
 
-        window.onload = initialize
+        function bindTopBarTouch() {
+            const top = document.getElementById('top-bar')
+            if (!top) return
+
+            const handleMobileOpen = (e) => {
+                if (window.innerWidth <= 768) {
+                    if (e && typeof e.preventDefault === 'function') e.preventDefault()
+                    openMobileSidebar()
+                }
+            }
+
+            top.addEventListener('click', handleMobileOpen)
+            top.addEventListener('touchstart', handleMobileOpen, { passive: true })
+        }
+
+        function openMobileSidebar() {
+            const mobileSidebar = document.getElementById('mobile-sidebar')
+            const mobilePanel = document.getElementById('mobile-sidebar-panel')
+            if (!mobileSidebar || !mobilePanel) return
+
+            mobileSidebar.classList.remove('hidden')
+            // small delay to allow CSS transition
+            requestAnimationFrame(() => {
+                mobileSidebar.style.opacity = '1'
+                mobileSidebar.setAttribute('aria-hidden', 'false')
+                mobilePanel.style.transform = 'translateX(0)'
+            })
+
+            // disable background scroll while open
+            document.body.style.overflow = 'hidden'
+        }
+
+        function closeMobileSidebar() {
+            const mobileSidebar = document.getElementById('mobile-sidebar')
+            const mobilePanel = document.getElementById('mobile-sidebar-panel')
+            if (!mobileSidebar || !mobilePanel) return
+
+            mobileSidebar.style.opacity = '0'
+            mobileSidebar.setAttribute('aria-hidden', 'true')
+            mobilePanel.style.transform = 'translateX(-100%)'
+
+            // wait for animation to finish before hiding
+            setTimeout(() => {
+                mobileSidebar.classList.add('hidden')
+                document.body.style.overflow = 'auto'
+            }, 300)
+        }
+
+        window.onload = function() { initialize(); bindTopBarTouch(); }
     </script>
 </body>
 </html>
